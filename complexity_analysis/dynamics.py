@@ -76,12 +76,21 @@ class DynamicsAnalyzer:
         if n < m + 1:
             return 0.0
         
+        # Ensure minimum data length for reliable calculation
+        if n < 50:
+            return np.nan
+        
+        # Ensure tolerance is not too small (avoid division by zero issues)
+        if tolerance <= 0:
+            tolerance = 0.001
+        
         # Create template vectors
         templates = np.array([data[i:i+m] for i in range(n-m+1)])
         
         # Count matches for m and m+1 dimensional vectors
         matches_m = 0
         matches_m1 = 0
+        valid_comparisons = 0
         
         for i in range(len(templates)):
             # Find matches for m-dimensional vectors
@@ -89,16 +98,41 @@ class DynamicsAnalyzer:
             matches_m += np.sum(distances_m <= tolerance) - 1  # Exclude self-match
             
             # Find matches for m+1 dimensional vectors
-            if i < len(templates) - 1:
+            if i < len(templates) - 1 and i + m < len(data):
                 template_m1 = np.append(templates[i], data[i+m])
-                distances_m1 = np.abs(np.column_stack([templates, data[m-1:n]]) - template_m1).max(axis=1)
-                matches_m1 += np.sum(distances_m1 <= tolerance) - 1
+                # Create m+1 dimensional templates for comparison
+                if i + m < len(data):
+                    templates_m1 = []
+                    for k in range(len(templates)):
+                        if k + m < len(data):
+                            templates_m1.append(np.append(templates[k], data[k+m]))
+                    
+                    if templates_m1:
+                        templates_m1 = np.array(templates_m1)
+                        distances_m1 = np.abs(templates_m1 - template_m1).max(axis=1)
+                        matches_m1 += np.sum(distances_m1 <= tolerance) - 1
+                        valid_comparisons += 1
         
-        # Calculate sample entropy
-        if matches_m1 == 0 or matches_m == 0:
+        # Calculate sample entropy with better numerical stability
+        if matches_m == 0 or valid_comparisons == 0:
             return 0.0
         
-        return -np.log(matches_m1 / matches_m)
+        # Normalize by number of valid comparisons
+        avg_matches_m = matches_m / len(templates)
+        avg_matches_m1 = matches_m1 / valid_comparisons
+        
+        # Avoid log(0) and ensure numerical stability
+        if avg_matches_m1 <= 0 or avg_matches_m <= 0:
+            return 0.0
+        
+        ratio = avg_matches_m1 / avg_matches_m
+        if ratio <= 0 or ratio >= 1:
+            return 0.0
+        
+        try:
+            return -np.log(ratio)
+        except (ValueError, OverflowError):
+            return np.nan
     
     def multiscale_entropy(self, data: np.ndarray, scales: Optional[List[int]] = None) -> Dict[int, float]:
         """
@@ -120,6 +154,11 @@ class DynamicsAnalyzer:
             try:
                 # Coarse-grain the data
                 coarse_data = self._coarse_grain(data, scale)
+                
+                # Check if coarse-grained data is long enough
+                if len(coarse_data) < 50:
+                    mse_results[scale] = np.nan
+                    continue
                 
                 # Calculate sample entropy
                 entropy_val = self._sample_entropy(coarse_data)
