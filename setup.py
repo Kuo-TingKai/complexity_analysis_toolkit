@@ -1,0 +1,22 @@
+from setuptools import setup, find_packages
+
+setup(
+    name="complexity-analysis",
+    version="1.0.0",
+    description="A comprehensive toolkit for measuring system complexity using information theory, dynamics, and network structure",
+    author="Your Name",
+    packages=find_packages(),
+    install_requires=[
+        "numpy>=1.21.0",
+        "scipy>=1.7.0",
+        "networkx>=2.6.0",
+        "matplotlib>=3.5.0",
+        "seaborn>=0.11.0",
+        "pandas>=1.3.0",
+        "nolds>=0.6.0",
+        "pyphi>=2.0.0",
+        "scikit-learn>=1.0.0",
+        "numba>=0.56.0"
+    ],
+    python_requires=">=3.8",
+)
