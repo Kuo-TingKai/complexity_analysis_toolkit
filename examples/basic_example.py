@@ -26,57 +26,73 @@ def generate_synthetic_systems():
     
     systems = {}
     
-    # 1. Random system (low complexity)
+    # 1. Random system (low complexity) - Pure white noise
     systems['random'] = np.random.randn(n_points, n_vars)
     
-    # 2. Linear system (medium complexity)
+    # 2. Linear system (medium complexity) - Linear trend with noise
     t = np.linspace(0, 10, n_points)
     linear_system = np.zeros((n_points, n_vars))
     for i in range(n_vars):
         linear_system[:, i] = 0.5 * t + np.random.randn(n_points) * 0.1
     systems['linear'] = linear_system
     
-    # 3. Coupled oscillator system (high complexity)
+    # 3. Coupled oscillator system (high complexity) - True oscillatory behavior
     dt = 0.01
     t = np.arange(0, n_points * dt, dt)
     coupled_system = np.zeros((len(t), n_vars))
     
-    # Initialize with random conditions
-    coupled_system[0, :] = np.random.randn(n_vars)
+    # Initialize with different phases for each oscillator
+    for j in range(n_vars):
+        coupled_system[0, j] = np.sin(2 * np.pi * j / n_vars)  # Different initial phases
     
-    # Simulate coupled oscillators
+    # Simulate coupled oscillators with proper oscillatory dynamics
     for i in range(1, len(t)):
         for j in range(n_vars):
-            # Coupling with neighbors
+            # Natural frequency with coupling to neighbors
+            omega = 1.0 + 0.1 * j  # Different natural frequencies
+            
+            # Coupling with neighbors (bidirectional)
             coupling = 0
             if j > 0:
-                coupling += 0.1 * (coupled_system[i-1, j-1] - coupled_system[i-1, j])
+                coupling += 0.2 * np.sin(coupled_system[i-1, j-1] - coupled_system[i-1, j])
             if j < n_vars - 1:
-                coupling += 0.1 * (coupled_system[i-1, j+1] - coupled_system[i-1, j])
+                coupling += 0.2 * np.sin(coupled_system[i-1, j+1] - coupled_system[i-1, j])
             
-            # Update with nonlinear dynamics
-            coupled_system[i, j] = coupled_system[i-1, j] + dt * (
-                0.5 * coupled_system[i-1, j] * (1 - coupled_system[i-1, j]**2) + 
-                coupling + 
-                0.05 * np.random.randn()
-            )
+            # Update oscillator phase
+            coupled_system[i, j] = coupled_system[i-1, j] + dt * (omega + coupling)
+    
+    # Convert phases to actual oscillator values
+    for j in range(n_vars):
+        coupled_system[:, j] = np.sin(coupled_system[:, j]) + 0.1 * np.random.randn(len(t))
     
     systems['coupled_oscillators'] = coupled_system
     
-    # 4. Chaotic system (very high complexity)
+    # 4. Chaotic system (very high complexity) - True chaotic dynamics
     chaotic_system = np.zeros((n_points, n_vars))
-    chaotic_system[0, :] = np.random.randn(n_vars) * 0.1
     
-    for i in range(1, n_points):
-        for j in range(n_vars):
-            # Lorenz-like chaotic dynamics
-            x, y, z = chaotic_system[i-1, j], chaotic_system[i-1, (j+1)%n_vars], chaotic_system[i-1, (j+2)%n_vars]
-            
-            dx = 10 * (y - x)
-            dy = x * (28 - z) - y
-            dz = x * y - (8/3) * z
-            
-            chaotic_system[i, j] = chaotic_system[i-1, j] + 0.01 * dx
+    # Initialize Lorenz-like chaotic system
+    x = np.random.randn() * 0.1
+    y = np.random.randn() * 0.1
+    z = np.random.randn() * 0.1 + 25
+    
+    dt = 0.01
+    
+    for i in range(n_points):
+        # Lorenz equations
+        dx = 10 * (y - x)
+        dy = x * (28 - z) - y
+        dz = x * y - (8/3) * z
+        
+        x += dx * dt
+        y += dy * dt
+        z += dz * dt
+        
+        # Store different components for different variables
+        chaotic_system[i, 0] = x
+        chaotic_system[i, 1] = y
+        chaotic_system[i, 2] = z
+        chaotic_system[i, 3] = x + y  # Combined signal
+        chaotic_system[i, 4] = np.sqrt(x**2 + y**2 + z**2)  # Magnitude
     
     systems['chaotic'] = chaotic_system
     
@@ -94,8 +110,9 @@ def visualize_results(systems, results):
     
     # Plot 1: Time series of each system
     ax1 = axes[0, 0]
+    colors = ['blue', 'red', 'green', 'purple']
     for i, (name, data) in enumerate(systems.items()):
-        ax1.plot(data[:200, 0] + i * 3, label=name, alpha=0.7)
+        ax1.plot(data[:200, 0], label=name, alpha=0.7, color=colors[i])
     ax1.set_title('Time Series (First Variable)')
     ax1.set_xlabel('Time')
     ax1.set_ylabel('Value')
